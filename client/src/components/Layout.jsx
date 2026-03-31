@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Scale, LayoutDashboard, Briefcase, Users, Clock, FileText, Landmark, CalendarDays, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, Clock, FileText, Landmark, CalendarDays, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import AppLogo from './AppLogo';
 
 const navItems = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -18,10 +19,9 @@ export default function Layout({ activePage, onNavigate, user, onLogout, childre
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className={`${collapsed ? 'w-16' : 'w-56'} bg-law-900 text-white flex flex-col transition-all duration-200`}>
-        <div className="flex items-center px-4 py-4 border-b border-law-800">
-          <Scale className="w-7 h-7 text-law-300 flex-shrink-0" />
-          {!collapsed && <span className="ml-3 font-semibold text-lg">OpenLawFirm</span>}
+      <aside className={`${collapsed ? 'w-16' : 'w-60'} bg-gradient-to-b from-law-900 via-law-900 to-law-950 text-white flex flex-col transition-all duration-300 shadow-xl shadow-black/20`}>
+        <div className="px-3 py-4 border-b border-law-800/50">
+          <AppLogo collapsed={collapsed} />
         </div>
 
         <nav className="flex-1 py-2 overflow-y-auto">
@@ -30,8 +30,10 @@ export default function Layout({ activePage, onNavigate, user, onLogout, childre
             const isActive = activePage === item.key;
             return (
               <button key={item.key} onClick={() => onNavigate(item.key)}
-                className={`w-full flex items-center px-4 py-2.5 text-sm transition
-                  ${isActive ? 'bg-law-700 text-white' : 'text-law-300 hover:bg-law-800 hover:text-white'}`}>
+                className={`w-full flex items-center px-3 py-2.5 mx-2 rounded-lg text-sm transition-all duration-150
+                  ${isActive
+                    ? 'bg-white/10 text-white shadow-sm shadow-black/10 backdrop-blur-sm'
+                    : 'text-law-300 hover:bg-white/5 hover:text-white'}`}>
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 {!collapsed && <span className="ml-3">{item.label}</span>}
               </button>
