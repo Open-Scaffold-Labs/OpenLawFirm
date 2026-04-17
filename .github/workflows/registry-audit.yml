@@ -1,0 +1,85 @@
+name: Registry Audit
+
+# Validates that this app's client port, server port, token key, and DB prefix
+# match the declared spec in openscaffold-core/registry/registry.json.
+# Fails the PR if any value diverges. Pulls the registry and the check script
+# from openscaffold-core at runtime, so this workflow never drifts from the
+# canonical source.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'client/vite.config.js'
+      - 'server/src/index.js'
+      - 'client/src/**'
+      - 'server/src/**'
+      - '.github/workflows/registry-audit.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registry-audit:
+    runs-on: ubuntu-latest
+    name: Check app conforms to registry
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Fetch registry.json and check-registry.sh from openscaffold-core
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          mkdir -p .audit
+          # Pull the current registry and check script from openscaffold-core main
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/Open-Scaffold-Labs/openscaffold-core/contents/registry/registry.json?ref=main" \
+            -o .audit/registry.json
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/Open-Scaffold-Labs/openscaffold-core/contents/scripts/check-registry.sh?ref=main" \
+            -o .audit/check-registry.sh
+          chmod +x .audit/check-registry.sh
+          # Sanity check
+          head -3 .audit/registry.json
+
+      - name: Install jq
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y jq
+          fi
+
+      - name: Run registry audit
+        env:
+          REGISTRY_PATH: ${{ github.workspace }}/.audit/registry.json
+        run: |
+          bash .audit/check-registry.sh "${{ github.workspace }}"
+
+      - name: Post PR comment on failure
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              "### 📋 Registry audit failed",
+              "",
+              "This app diverges from the spec declared in [openscaffold-core/registry/registry.json](https://github.com/Open-Scaffold-Labs/openscaffold-core/blob/main/registry/registry.json).",
+              "",
+              "See the workflow log above for the specific field(s) that diverge.",
+              "",
+              "**To fix:** either update this app to match the registry, or (if the registry is wrong) open a PR on `openscaffold-core` to update the registry entry.",
+              "",
+              "**To exempt:** if this app deliberately uses a non-standard pattern (Next.js single-package, site-only, infrastructure package), set the `pattern` field on its registry entry accordingly.",
+            ].join("\n");
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
