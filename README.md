@@ -4,7 +4,7 @@
 
 An open-source, modular practice management platform built on the [Open Scaffold Labs](https://openscaffoldlabs.com) shared infrastructure. One PostgreSQL database. One component library. One adapter layer. No integration tax.
 
-> ⚠️ **Status: Early development.** Schema, routes, and the React shell are in place. Core compliance workflows (three-way IOLTA reconciliation, LEDES export, jurisdiction-aware deadlines) are being hardened. Not yet ready for production use in a live law firm. See [IMPLEMENTATION.md](./IMPLEMENTATION.md) for the roadmap to v1.0.
+> ⚠️ **Status: Demo-ready locally; production deploy pending.** The full stack (API, OAuth 2.0 + PKCE auth, MCP server with all 7 tools wired) runs end-to-end against the shared PostgreSQL database with a realistic 10-matter / 59-time-entry / $92K-IOLTA seed dataset. Production deployment to `*.openscaffoldlabs.com` subdomains is the remaining gate before Anthropic Connectors Directory submission. See [STATUS.md](./STATUS.md) for the live submission-readiness tracker and [IMPLEMENTATION.md](./IMPLEMENTATION.md) for the phased roadmap.
 
 ## Why
 
@@ -73,9 +73,17 @@ cd client && npm run dev
 
 Demo credentials for local development are documented in `CLAUDE.md`.
 
+For a richer demo dataset (10 matters across 6 practice areas, 59 time entries, IOLTA balances, upcoming deadlines), run:
+
+```bash
+cd server && node --env-file=.env seed-realistic.js
+```
+
+To walk through the full Claude + OpenLawFirm demo, follow [`mcp/DEMO-SETUP.md`](./mcp/DEMO-SETUP.md) — it has every command and prompt for the 5-minute, 6-scene demo flow.
+
 ## Roadmap
 
-See [IMPLEMENTATION.md](./IMPLEMENTATION.md) for the full phased plan and the strategic reframe in light of Anthropic's May 2026 Claude for Legal launch.
+See [IMPLEMENTATION.md](./IMPLEMENTATION.md) for the full phased plan and the strategic reframe in light of Anthropic's May 2026 Claude for Legal launch. See [STATUS.md](./STATUS.md) for the live submission-readiness tracker.
 
 In summary:
 
