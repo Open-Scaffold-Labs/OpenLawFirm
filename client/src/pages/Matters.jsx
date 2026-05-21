@@ -1,47 +1,69 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../auth';
-import { Briefcase, Plus, Search, Filter } from 'lucide-react';
+import { Briefcase, Plus } from 'lucide-react';
+import DataTable from '@openscaffold/core/components/DataTable';
 import MatterFormModal from '../components/MatterFormModal';
+
+const STATUS_TONES = {
+  open: 'bg-green-100 text-green-800',
+  closed: 'bg-gray-100 text-gray-800',
+  pending: 'bg-yellow-100 text-yellow-800',
+  on_hold: 'bg-orange-100 text-orange-800',
+};
+
+const STATUS_OPTIONS = ['', 'open', 'pending', 'on_hold', 'closed'];
 
 export default function Matters({ onNavigate }) {
   const [matters, setMatters] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    loadMatters();
-  }, [statusFilter]);
+  useEffect(() => { loadMatters(); }, [statusFilter]);
 
   async function loadMatters() {
     setLoading(true);
     const params = new URLSearchParams();
     if (statusFilter) params.set('status', statusFilter);
-    if (search) params.set('search', search);
     const res = await apiFetch(`/api/matters?${params}`);
     setMatters(await res.json());
     setLoading(false);
   }
 
-  function handleSearch(e) {
-    e.preventDefault();
-    loadMatters();
-  }
+  // Project a clean row shape for the table.
+  const rows = matters.map((m) => ({
+    id: m.id,
+    matter_number: m.matter_number,
+    title: m.title,
+    client: m.company_name || `${m.client_first || ''} ${m.client_last || ''}`.trim(),
+    practice_area: m.practice_area_name,
+    responsible_attorney: m.attorney_name,
+    status: m.status,
+    date_opened: m.date_opened,
+    total_billed: parseFloat(m.total_billed || 0),
+    total_hours: parseFloat(m.total_hours || 0),
+    raw: m,
+  }));
 
-  const statusColors = {
-    open: 'bg-green-100 text-green-800',
-    closed: 'bg-gray-100 text-gray-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    on_hold: 'bg-orange-100 text-orange-800',
-  };
-
-  const billingLabels = {
-    hourly: 'Hourly',
-    flat_fee: 'Flat Fee',
-    contingency: 'Contingency',
-    retainer: 'Retainer',
-  };
+  const columns = [
+    { key: 'matter_number', label: 'Matter #', render: (v) => <span className="font-mono text-law-700 text-xs">{v}</span> },
+    { key: 'title', label: 'Title', render: (v) => <span className="font-medium text-gray-900">{v}</span> },
+    { key: 'client', label: 'Client' },
+    { key: 'practice_area', label: 'Practice area' },
+    { key: 'responsible_attorney', label: 'Attorney' },
+    { key: 'date_opened', label: 'Opened',
+      render: (v) => v ? new Date(v).toLocaleDateString() : '—' },
+    { key: 'total_hours', label: 'Hours', align: 'right',
+      render: (v) => v ? v.toFixed(1) : '—' },
+    { key: 'total_billed', label: 'Billed', align: 'right',
+      render: (v) => v ? `$${v.toLocaleString('en-US', { minimumFractionDigits: 0 })}` : '—' },
+    { key: 'status', label: 'Status', sortable: true,
+      render: (v) => (
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_TONES[v] || 'bg-gray-100 text-gray-700'}`}>
+          {(v || '').replace(/_/g, ' ')}
+        </span>
+      ) },
+  ];
 
   return (
     <div>
@@ -55,68 +77,33 @@ export default function Matters({ onNavigate }) {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 mb-4">
-        <form onSubmit={handleSearch} className="flex-1 relative">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search matters..."
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-law-500" />
-        </form>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-law-500">
-          <option value="">All Statuses</option>
-          <option value="open">Open</option>
-          <option value="closed">Closed</option>
-          <option value="pending">Pending</option>
-          <option value="on_hold">On Hold</option>
-        </select>
+      <div className="flex items-center gap-2 mb-4">
+        {STATUS_OPTIONS.map((s) => (
+          <button key={s || 'all'} onClick={() => setStatusFilter(s)}
+            className={`px-3 py-1.5 rounded-lg text-sm border transition capitalize ${
+              statusFilter === s
+                ? 'bg-law-600 text-white border-law-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}>
+            {s ? s.replace(/_/g, ' ') : 'All'}
+          </button>
+        ))}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Matter #</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Title</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Client</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Practice Area</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Billing</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Attorney</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Billed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan="8" className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
-            ) : matters.length === 0 ? (
-              <tr><td colSpan="8" className="px-4 py-8 text-center text-gray-400">No matters found</td></tr>
-            ) : matters.map(m => (
-              <tr key={m.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                onClick={() => onNavigate('matter-detail', { matterId: m.id })}>
-                <td className="px-4 py-3 font-mono text-law-700">{m.matter_number}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">{m.title}</td>
-                <td className="px-4 py-3 text-gray-600">
-                  {m.company_name || `${m.client_first || ''} ${m.client_last || ''}`}
-                </td>
-                <td className="px-4 py-3 text-gray-600">{m.practice_area_name || '—'}</td>
-                <td className="px-4 py-3 text-gray-600">{billingLabels[m.billing_type] || m.billing_type}</td>
-                <td className="px-4 py-3 text-gray-600">{m.attorney_name || '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[m.status] || 'bg-gray-100 text-gray-600'}`}>
-                    {m.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right font-medium text-gray-900">
-                  ${parseFloat(m.total_billed || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <div className="animate-pulse text-gray-400">Loading matters…</div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={rows}
+          searchable
+          searchFields={['matter_number', 'title', 'client', 'practice_area', 'responsible_attorney']}
+          pageSize={25}
+          striped={false}
+          emptyMessage="No matters found"
+          onRowClick={(row) => onNavigate?.('matter-detail', { matterId: row.id })}
+        />
+      )}
 
       <MatterFormModal
         open={showForm}
