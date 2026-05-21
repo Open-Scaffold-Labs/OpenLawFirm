@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const { createNumberGenerator } = require('@openscaffold/core/server/numberGenerator');
 const { generateInvoicePDF } = require('../generate-invoice-pdf');
+const { generateLedes1998B } = require('../generate-ledes-1998b');
 
 module.exports = function (pool, logAudit) {
   const router = express.Router();
@@ -262,6 +263,68 @@ module.exports = function (pool, logAudit) {
     } catch (err) {
       console.error('PDF generation error:', err);
       res.status(500).json({ error: 'PDF generation failed', detail: String(err.message || err) });
+    }
+  });
+
+  /* Download invoice as LEDES 1998B text (for corporate / insurance carrier e-billing) */
+  router.get('/:id/ledes', async (req, res) => {
+    try {
+      const inv = await pool.query(`
+        SELECT i.*, m.matter_number, m.title AS matter_title
+        FROM olf_invoices i
+        LEFT JOIN olf_matters m ON i.matter_id = m.id
+        WHERE i.id = $1
+      `, [req.params.id]);
+      if (!inv.rows.length) return res.status(404).json({ error: 'Invoice not found' });
+      const invoice = inv.rows[0];
+
+      const lineItemsRes = await pool.query(
+        'SELECT * FROM olf_invoice_line_items WHERE invoice_id = $1 ORDER BY sort_order, id',
+        [req.params.id]
+      );
+      const lineItems = lineItemsRes.rows;
+
+      // Lookup source time entries + expenses for full LEDES detail
+      const timeEntryIds = lineItems.filter((l) => l.time_entry_id).map((l) => l.time_entry_id);
+      const expenseIds = lineItems.filter((l) => l.expense_id).map((l) => l.expense_id);
+
+      const [timeEntriesRes, expensesRes] = await Promise.all([
+        timeEntryIds.length
+          ? pool.query('SELECT * FROM olf_time_entries WHERE id = ANY($1::int[])', [timeEntryIds])
+          : Promise.resolve({ rows: [] }),
+        expenseIds.length
+          ? pool.query('SELECT * FROM olf_expenses WHERE id = ANY($1::int[])', [expenseIds])
+          : Promise.resolve({ rows: [] }),
+      ]);
+
+      const userIds = [...new Set(timeEntriesRes.rows.map((t) => t.user_id).filter(Boolean))];
+      const staffRes = userIds.length
+        ? await pool.query('SELECT id, name, role FROM users WHERE id = ANY($1::int[])', [userIds])
+        : { rows: [] };
+
+      const firmSettings = await pool.query(
+        "SELECT key, value FROM olf_settings WHERE key IN ('firm_name','law_firm_id')"
+      );
+      const settings = Object.fromEntries(firmSettings.rows.map((r) => [r.key, r.value]));
+
+      const ledes = generateLedes1998B({
+        invoice,
+        lineItems,
+        timeEntries: timeEntriesRes.rows,
+        expenses: expensesRes.rows,
+        staff: staffRes.rows,
+        firm: {
+          law_firm_id: settings.law_firm_id || 'OPENLAWFIRM',
+          law_firm_name: settings.firm_name || 'OpenLawFirm',
+        },
+      });
+
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoice_number}.ledes"`);
+      res.send(ledes);
+    } catch (err) {
+      console.error('LEDES generation error:', err);
+      res.status(500).json({ error: 'LEDES generation failed', detail: String(err.message || err) });
     }
   });
 
