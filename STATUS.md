@@ -1,10 +1,10 @@
 # OpenLawFirm — Submission Readiness Status
 
-**Updated:** 2026-05-19
+**Updated:** 2026-05-21 (overnight polish sweep)
 **Goal:** Submit `openlawfirm-mcp` to Anthropic Connectors Directory
 **Critical-path estimate to submission:** ~2 weeks (gated on Matt's production deploy + Dale's partner program follow-throughs)
 
-This is the single source of truth for "where are we, and what's gating the next milestone." Updated as deliverables land.
+This is the single source of truth for "where are we, and what's gating the next milestone." Updated as deliverables land. See [SESSION-WRAP.md](./SESSION-WRAP.md) for the latest session summary.
 
 ---
 
@@ -13,11 +13,25 @@ This is the single source of truth for "where are we, and what's gating the next
 | Phase | State | What's missing |
 |---|---|---|
 | **Sprint 1** — Foundation hardening | ✓ Engineering done locally | Production deploy, OpenFirehouse migration |
-| **Sprint 2** — MCP server + submission package | ✓ All 4 deliverables shipped | Production HTTPS deploy + favicon + Pages enable |
+| **Sprint 2** — MCP server + submission package | ✓ Engineering done, Pages enabled | Production HTTPS deploy + favicon |
 | **Sprint 3** — Native CONNECT adapters | ✓ Code done, awaiting credentials | Box / iManage / NetDocuments partner program signups |
 | **Sprint 4** — Demo readiness | ✓ Seed + run-book + status doc | 5-minute video, design-partner outreach |
+| **Sprint 5+** — Polish + shared modules + CRUD | ✓ Complete (overnight sweep) | Optional future polish (see SESSION-WRAP) |
 
-**One-line summary:** Engineering is functionally complete and demo-ready locally. The remaining work is *operational* (deployments, account signups, video recording) — not coding.
+**One-line summary:** Engineering is functionally complete and demo-ready locally. The React app now has working CRUD across every entity. The remaining work is *operational* (deployments, account signups, video recording) — not coding.
+
+---
+
+## What's new since the original Sprint 1–4 ship
+
+The session of 2026-05-20/21 added:
+
+- **CRUD across every entity** — Matters, Clients, Time Entries, Expenses, Contacts, Documents, Calendar, Trust transactions, Invoice generation + payment recording, all working through Modal-based forms
+- **Shared modules from `@openscaffold/core`** — number generator (invoice + matter numbers), DataTable (sortable / searchable / paginated list views), PDF generation pattern (Python + reportlab matching the proposal generator)
+- **LEDES 1998B invoice export** — 24-field pipe-delimited e-billing file with UTBMS task + activity codes, timekeeper classification, billing window dates
+- **Server-side invoice PDF generation** — branded letterhead, bill-to, line items by category, totals, payment history
+- **Utilization dashboard** — managing-partner view with firm-wide hours, per-attorney utilization vs. target, AR aging buckets, top matters by hours
+- **Realistic demo seed** — 10 matters across 6 practice areas, 50+ time entries with UTBMS codes, $92K trust balance, 5 invoices, 12 documents, 18 calendar events
 
 ---
 
