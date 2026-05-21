@@ -308,8 +308,9 @@ async function initDb() {
       const bcrypt = require('bcryptjs');
       const hash = await bcrypt.hash('lawfirm1234', 10);
 
+      // Shared users table uses camelCase passwordHash + single 'name' field.
       await client.query(
-        `INSERT INTO users (username, password_hash, full_name, role, email) VALUES
+        `INSERT INTO users (username, "passwordHash", name, role, email) VALUES
          ($1, $2, $3, $4, $5),
          ($6, $2, $7, $8, $9),
          ($10, $2, $11, $12, $13)

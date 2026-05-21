@@ -78,7 +78,7 @@ module.exports = function (pool, logAudit) {
   router.get('/:id/matters', async (req, res) => {
     try {
       const { rows } = await pool.query(
-        `SELECT m.*, pa.name as practice_area_name, u.full_name as attorney_name
+        `SELECT m.*, pa.name as practice_area_name, u.name as attorney_name
          FROM olf_matters m
          LEFT JOIN olf_practice_areas pa ON m.practice_area_id = pa.id
          LEFT JOIN users u ON m.responsible_attorney = u.id

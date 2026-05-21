@@ -73,19 +73,24 @@ async function logAudit(entityType, entityId, userId, action, detail) {
 }
 
 /* ── Auth routes ────────────────────────────────────── */
+// Shared users table is OpenFirehouse-style: columns are `name` (single field)
+// and `passwordHash` (camelCase, ecosystem convention). OpenLawFirm aliases
+// name → full_name in JWT claims and API responses for internal consistency.
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
     if (!rows.length) return res.status(401).json({ error: 'Invalid credentials' });
     const user = rows[0];
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const hash = user.passwordHash || user.password;
+    if (!hash) return res.status(401).json({ error: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, hash);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, full_name: user.full_name },
+      { id: user.id, username: user.username, role: user.role, full_name: user.name },
       JWT_SECRET, { expiresIn: '24h' }
     );
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name } });
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.name } });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -94,7 +99,10 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/me', auth, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT id, username, full_name, role, email FROM users WHERE id = $1', [req.user.id]);
+    const { rows } = await pool.query(
+      'SELECT id, username, name AS full_name, role, email FROM users WHERE id = $1',
+      [req.user.id]
+    );
     if (!rows.length) return res.status(404).json({ error: 'User not found' });
     res.json(rows[0]);
   } catch (err) {
@@ -147,7 +155,7 @@ app.get('/api/dashboard', auth, async (req, res) => {
         ORDER BY ce.start_time LIMIT 10
       `),
       pool.query(`
-        SELECT te.*, m.matter_number, u.full_name
+        SELECT te.*, m.matter_number, u.name
         FROM olf_time_entries te
         LEFT JOIN olf_matters m ON te.matter_id = m.id
         LEFT JOIN users u ON te.user_id = u.id
@@ -189,11 +197,11 @@ app.use('/api/settings', auth, settingsRoutes(pool));
 app.get('/api/staff', auth, async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT u.id, u.username, u.full_name, u.role, u.email,
+      SELECT u.id, u.username, u.name, u.role, u.email,
              br.hourly_rate
       FROM users u
       LEFT JOIN olf_billing_rates br ON br.user_id = u.id AND br.end_date IS NULL
-      ORDER BY u.full_name
+      ORDER BY u.name
     `);
     res.json(rows);
   } catch (err) {

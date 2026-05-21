@@ -10,7 +10,7 @@ module.exports = function (pool, logAudit) {
       let sql = `
         SELECT m.*, c.first_name as client_first, c.last_name as client_last, c.company_name,
                pa.name as practice_area_name, pa.code as practice_area_code,
-               u.full_name as attorney_name, u2.full_name as originating_attorney_name,
+               u.name as attorney_name, u2.name as originating_attorney_name,
                (SELECT COALESCE(SUM(te.hours * te.rate), 0) FROM olf_time_entries te WHERE te.matter_id = m.id AND te.billable = true) as total_billed,
                (SELECT COALESCE(SUM(te.hours), 0) FROM olf_time_entries te WHERE te.matter_id = m.id) as total_hours,
                (SELECT COALESCE(SUM(ctl.balance), 0) FROM olf_client_trust_ledger ctl WHERE ctl.matter_id = m.id) as trust_balance
@@ -43,7 +43,7 @@ module.exports = function (pool, logAudit) {
     try {
       const { rows } = await pool.query(`
         SELECT m.*, c.first_name as client_first, c.last_name as client_last, c.company_name, c.email as client_email,
-               pa.name as practice_area_name, u.full_name as attorney_name
+               pa.name as practice_area_name, u.name as attorney_name
         FROM olf_matters m
         LEFT JOIN olf_clients c ON m.client_id = c.id
         LEFT JOIN olf_practice_areas pa ON m.practice_area_id = pa.id
@@ -113,7 +113,7 @@ module.exports = function (pool, logAudit) {
   router.get('/:id/time-entries', async (req, res) => {
     try {
       const { rows } = await pool.query(`
-        SELECT te.*, u.full_name
+        SELECT te.*, u.name
         FROM olf_time_entries te
         LEFT JOIN users u ON te.user_id = u.id
         WHERE te.matter_id = $1
@@ -129,7 +129,7 @@ module.exports = function (pool, logAudit) {
   router.get('/:id/expenses', async (req, res) => {
     try {
       const { rows } = await pool.query(`
-        SELECT e.*, u.full_name
+        SELECT e.*, u.name
         FROM olf_expenses e
         LEFT JOIN users u ON e.user_id = u.id
         WHERE e.matter_id = $1
@@ -171,7 +171,7 @@ module.exports = function (pool, logAudit) {
   router.get('/:id/documents', async (req, res) => {
     try {
       const { rows } = await pool.query(
-        `SELECT d.*, u.full_name as uploaded_by_name FROM olf_documents d
+        `SELECT d.*, u.name as uploaded_by_name FROM olf_documents d
          LEFT JOIN users u ON d.uploaded_by = u.id
          WHERE d.matter_id = $1 ORDER BY d.created_at DESC`,
         [req.params.id]

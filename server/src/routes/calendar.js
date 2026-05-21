@@ -9,7 +9,7 @@ module.exports = function (pool, logAudit) {
       const { matter_id, user_id, event_type, date_from, date_to } = req.query;
       let sql = `
         SELECT ce.*, m.matter_number, m.title as matter_title,
-               u.full_name as user_name
+               u.name as user_name
         FROM olf_calendar_events ce
         LEFT JOIN olf_matters m ON ce.matter_id = m.id
         LEFT JOIN users u ON ce.user_id = u.id

@@ -16,7 +16,7 @@ module.exports = function (pool, logAudit) {
       let sql = `
         SELECT te.*, m.matter_number, m.title as matter_title,
                c.first_name as client_first, c.last_name as client_last,
-               u.full_name
+               u.name
         FROM olf_time_entries te
         LEFT JOIN olf_matters m ON te.matter_id = m.id
         LEFT JOIN olf_clients c ON m.client_id = c.id

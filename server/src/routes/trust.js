@@ -21,7 +21,7 @@ module.exports = function (pool, logAudit) {
       const { account_id, client_id, matter_id } = req.query;
       let sql = `
         SELECT tt.*, c.first_name as client_first, c.last_name as client_last,
-               m.matter_number, u.full_name as created_by_name
+               m.matter_number, u.name as created_by_name
         FROM olf_trust_transactions tt
         LEFT JOIN olf_clients c ON tt.client_id = c.id
         LEFT JOIN olf_matters m ON tt.matter_id = m.id

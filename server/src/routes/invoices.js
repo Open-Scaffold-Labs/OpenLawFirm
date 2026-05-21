@@ -69,7 +69,7 @@ module.exports = function (pool, logAudit) {
 
       // Get approved, unbilled time entries
       const timeEntries = await pool.query(`
-        SELECT te.*, u.full_name FROM olf_time_entries te
+        SELECT te.*, u.name FROM olf_time_entries te
         LEFT JOIN users u ON te.user_id = u.id
         WHERE te.matter_id = $1 AND te.status = 'approved' AND te.billed_on_invoice_id IS NULL AND te.billable = true
         ORDER BY te.entry_date
@@ -118,7 +118,7 @@ module.exports = function (pool, logAudit) {
         await pool.query(
           `INSERT INTO olf_invoice_line_items (invoice_id, line_type, time_entry_id, description, quantity, rate, amount, sort_order)
            VALUES ($1, 'fee', $2, $3, $4, $5, $6, $7)`,
-          [invoiceId, te.id, `${te.entry_date} — ${te.full_name}: ${te.description}`, te.hours, te.rate, amount, sortOrder++]
+          [invoiceId, te.id, `${te.entry_date} — ${te.name}: ${te.description}`, te.hours, te.rate, amount, sortOrder++]
         );
         // Mark time entry as billed
         await pool.query('UPDATE olf_time_entries SET billed_on_invoice_id = $1, status = $2 WHERE id = $3', [invoiceId, 'billed', te.id]);
