@@ -1,15 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../auth';
-import { CalendarDays, Plus, AlertTriangle, Gavel } from 'lucide-react';
+import { CalendarDays, Plus, AlertTriangle, Gavel, Pencil, Trash2 } from 'lucide-react';
+import CalendarFormModal from '../components/CalendarFormModal';
 
 export default function Calendar({ onNavigate }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [editing, setEditing] = useState(null);
 
   useEffect(() => {
     loadEvents();
   }, [filter]);
+
+  async function handleDelete(id) {
+    if (!confirm('Delete this calendar event?')) return;
+    const res = await apiFetch(`/api/calendar/${id}`, { method: 'DELETE' });
+    if (res.ok) loadEvents();
+  }
 
   async function loadEvents() {
     setLoading(true);
@@ -38,7 +46,8 @@ export default function Calendar({ onNavigate }) {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
           <CalendarDays className="w-6 h-6 mr-2 text-law-600" /> Calendar & Deadlines
         </h1>
-        <button className="bg-law-600 text-white px-4 py-2 rounded-lg hover:bg-law-700 transition flex items-center text-sm">
+        <button onClick={() => setEditing({})}
+          className="bg-law-600 text-white px-4 py-2 rounded-lg hover:bg-law-700 transition flex items-center text-sm">
           <Plus className="w-4 h-4 mr-1" /> New Event
         </button>
       </div>
@@ -89,11 +98,28 @@ export default function Calendar({ onNavigate }) {
                     <Gavel className="w-3 h-3 mr-1" /> Court Date
                   </span>
                 )}
+                <div className="flex items-center justify-end gap-2 mt-2">
+                  <button onClick={() => setEditing(e)} title="Edit"
+                    className="text-gray-400 hover:text-gray-700">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete(e.id)} title="Delete"
+                    className="text-red-500 hover:text-red-700">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      <CalendarFormModal
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        onSaved={loadEvents}
+        event={editing && editing.id ? editing : null}
+      />
     </div>
   );
 }

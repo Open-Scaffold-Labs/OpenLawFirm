@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../auth';
 import { Users, Plus, Search } from 'lucide-react';
+import ClientFormModal from '../components/ClientFormModal';
 
 export default function Clients({ onNavigate }) {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [editing, setEditing] = useState(null); // null=closed, {}=new, {id,...}=edit
 
   useEffect(() => { loadClients(); }, []);
 
@@ -28,7 +30,8 @@ export default function Clients({ onNavigate }) {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
           <Users className="w-6 h-6 mr-2 text-law-600" /> Clients
         </h1>
-        <button className="bg-law-600 text-white px-4 py-2 rounded-lg hover:bg-law-700 transition flex items-center text-sm">
+        <button onClick={() => setEditing({})}
+          className="bg-law-600 text-white px-4 py-2 rounded-lg hover:bg-law-700 transition flex items-center text-sm">
           <Plus className="w-4 h-4 mr-1" /> New Client
         </button>
       </div>
@@ -59,7 +62,8 @@ export default function Clients({ onNavigate }) {
             ) : clients.length === 0 ? (
               <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-400">No clients found</td></tr>
             ) : clients.map(c => (
-              <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
+              <tr key={c.id} onClick={() => setEditing(c)}
+                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
                 <td className="px-4 py-3 font-medium text-gray-900">
                   {c.client_type === 'company' ? c.company_name : `${c.first_name} ${c.last_name}`}
                 </td>
@@ -80,6 +84,13 @@ export default function Clients({ onNavigate }) {
           </tbody>
         </table>
       </div>
+
+      <ClientFormModal
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        onSaved={() => loadClients()}
+        client={editing && editing.id ? editing : null}
+      />
     </div>
   );
 }

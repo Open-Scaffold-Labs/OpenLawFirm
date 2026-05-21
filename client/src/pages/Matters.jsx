@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../auth';
 import { Briefcase, Plus, Search, Filter } from 'lucide-react';
+import MatterFormModal from '../components/MatterFormModal';
 
 export default function Matters({ onNavigate }) {
   const [matters, setMatters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
     loadMatters();
@@ -47,7 +49,8 @@ export default function Matters({ onNavigate }) {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
           <Briefcase className="w-6 h-6 mr-2 text-law-600" /> Matters
         </h1>
-        <button className="bg-law-600 text-white px-4 py-2 rounded-lg hover:bg-law-700 transition flex items-center text-sm">
+        <button onClick={() => setShowForm(true)}
+          className="bg-law-600 text-white px-4 py-2 rounded-lg hover:bg-law-700 transition flex items-center text-sm">
           <Plus className="w-4 h-4 mr-1" /> New Matter
         </button>
       </div>
@@ -114,6 +117,12 @@ export default function Matters({ onNavigate }) {
           </tbody>
         </table>
       </div>
+
+      <MatterFormModal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        onSaved={() => loadMatters()}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../auth';
-import { Landmark, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Landmark, Plus, AlertTriangle, CheckCircle, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import TrustTransactionModal from '../components/TrustTransactionModal';
 
 export default function TrustAccounting({ onNavigate }) {
   const [accounts, setAccounts] = useState([]);
@@ -9,20 +10,24 @@ export default function TrustAccounting({ onNavigate }) {
   const [reconciliation, setReconciliation] = useState([]);
   const [tab, setTab] = useState('overview');
   const [loading, setLoading] = useState(true);
+  const [txnKind, setTxnKind] = useState(null); // null | 'deposit' | 'disbursement'
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch('/api/trust/accounts').then(r => r.json()),
-      apiFetch('/api/trust/transactions').then(r => r.json()),
-      apiFetch('/api/trust/client-ledger').then(r => r.json()),
-      apiFetch('/api/trust/reconciliation').then(r => r.json()),
-    ]).then(([a, t, cl, r]) => {
-      setAccounts(a);
-      setTransactions(t);
-      setClientLedger(cl);
-      setReconciliation(r);
-    }).finally(() => setLoading(false));
-  }, []);
+  useEffect(() => { reload(); }, []);
+
+  async function reload() {
+    setLoading(true);
+    const [a, t, cl, r] = await Promise.all([
+      apiFetch('/api/trust/accounts').then((r) => r.json()),
+      apiFetch('/api/trust/transactions').then((r) => r.json()),
+      apiFetch('/api/trust/client-ledger').then((r) => r.json()),
+      apiFetch('/api/trust/reconciliation').then((r) => r.json()).catch(() => []),
+    ]);
+    setAccounts(a);
+    setTransactions(t);
+    setClientLedger(cl);
+    setReconciliation(r);
+    setLoading(false);
+  }
 
   if (loading) return <div className="animate-pulse text-gray-400">Loading trust accounts...</div>;
 
@@ -39,6 +44,16 @@ export default function TrustAccounting({ onNavigate }) {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
           <Landmark className="w-6 h-6 mr-2 text-law-600" /> Trust / IOLTA Accounts
         </h1>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setTxnKind('deposit')}
+            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition flex items-center text-sm">
+            <ArrowDownCircle className="w-4 h-4 mr-1" /> Deposit
+          </button>
+          <button onClick={() => setTxnKind('disbursement')}
+            className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition flex items-center text-sm">
+            <ArrowUpCircle className="w-4 h-4 mr-1" /> Disbursement
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -176,6 +191,13 @@ export default function TrustAccounting({ onNavigate }) {
           ))}
         </div>
       )}
+
+      <TrustTransactionModal
+        open={txnKind !== null}
+        onClose={() => setTxnKind(null)}
+        onSaved={reload}
+        kind={txnKind}
+      />
     </div>
   );
 }

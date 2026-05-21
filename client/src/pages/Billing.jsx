@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../auth';
 import { FileText, Plus, Send, DollarSign } from 'lucide-react';
+import PaymentModal from '../components/PaymentModal';
 
 export default function Billing({ onNavigate }) {
   const [invoices, setInvoices] = useState([]);
@@ -8,6 +9,7 @@ export default function Billing({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [showGenerate, setShowGenerate] = useState(false);
   const [selectedMatter, setSelectedMatter] = useState('');
+  const [paymentInvoice, setPaymentInvoice] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -140,18 +142,37 @@ export default function Billing({ onNavigate }) {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  {i.status === 'draft' && (
-                    <button onClick={() => handleStatusChange(i.id, 'sent')}
-                      className="flex items-center text-xs text-blue-700 hover:underline">
-                      <Send className="w-3 h-3 mr-1" /> Send
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {i.status === 'draft' && (
+                      <button onClick={() => handleStatusChange(i.id, 'sent')}
+                        className="flex items-center text-xs text-blue-700 hover:underline">
+                        <Send className="w-3 h-3 mr-1" /> Send
+                      </button>
+                    )}
+                    {['sent', 'partial', 'overdue'].includes(i.status) && (
+                      <button onClick={() => setPaymentInvoice(i)}
+                        className="flex items-center text-xs text-emerald-700 hover:underline">
+                        <DollarSign className="w-3 h-3 mr-1" /> Record payment
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <PaymentModal
+        open={paymentInvoice !== null}
+        onClose={() => setPaymentInvoice(null)}
+        onSaved={() => {
+          setPaymentInvoice(null);
+          // Reload invoices to reflect new balance
+          apiFetch('/api/invoices').then((r) => r.json()).then(setInvoices);
+        }}
+        invoice={paymentInvoice}
+      />
     </div>
   );
 }
