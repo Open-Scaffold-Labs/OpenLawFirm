@@ -1,7 +1,22 @@
 const express = require('express');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { createNumberGenerator } = require('@openscaffold/core/server/numberGenerator');
+const { generateInvoicePDF } = require('../generate-invoice-pdf');
 
 module.exports = function (pool, logAudit) {
   const router = express.Router();
+
+  // Shared sequential number generator from @openscaffold/core
+  // Pattern: INV-00001, INV-00002, ... (global mode, 5-digit pad)
+  const generateInvoiceNumber = createNumberGenerator({
+    prefix: 'INV',
+    table: 'olf_invoices',
+    column: 'invoice_number',
+    mode: 'global',
+    padWidth: 5,
+  });
 
   /* List invoices */
   router.get('/', async (req, res) => {
@@ -85,10 +100,8 @@ module.exports = function (pool, logAudit) {
         );
       }
 
-      // Generate invoice number
-      const prefix = (await pool.query("SELECT value FROM olf_settings WHERE key = 'invoice_prefix'")).rows[0]?.value || 'INV';
-      const countResult = await pool.query('SELECT COUNT(*) FROM olf_invoices');
-      const invoiceNumber = `${prefix}-${String(parseInt(countResult.rows[0].count) + 1).padStart(5, '0')}`;
+      // Generate invoice number via shared @openscaffold/core utility
+      const invoiceNumber = await generateInvoiceNumber(pool);
 
       // Calculate totals
       let subtotalFees = 0;
@@ -188,6 +201,67 @@ module.exports = function (pool, logAudit) {
       res.status(201).json(payment.rows[0]);
     } catch (err) {
       res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  /* Download invoice PDF — uses shared reportlab pattern from openscaffold-core */
+  router.get('/:id/pdf', async (req, res) => {
+    try {
+      // Load invoice with full context (matter, client, addresses) + line items + payments
+      const inv = await pool.query(`
+        SELECT i.*, m.matter_number, m.title AS matter_title,
+               c.first_name AS client_first, c.last_name AS client_last, c.company_name,
+               c.address, c.city, c.state, c.zip, c.email AS client_email
+        FROM olf_invoices i
+        LEFT JOIN olf_matters m ON i.matter_id = m.id
+        LEFT JOIN olf_clients c ON i.client_id = c.id
+        WHERE i.id = $1
+      `, [req.params.id]);
+      if (!inv.rows.length) return res.status(404).json({ error: 'Invoice not found' });
+
+      const [lineItems, payments, firmSettings] = await Promise.all([
+        pool.query(
+          'SELECT * FROM olf_invoice_line_items WHERE invoice_id = $1 ORDER BY sort_order, id',
+          [req.params.id]
+        ),
+        pool.query(
+          'SELECT * FROM olf_payments WHERE invoice_id = $1 ORDER BY payment_date',
+          [req.params.id]
+        ),
+        pool.query(
+          "SELECT key, value FROM olf_settings WHERE key IN ('firm_name','firm_address','firm_phone','firm_email','default_payment_terms')"
+        ),
+      ]);
+
+      const settings = Object.fromEntries(firmSettings.rows.map((r) => [r.key, r.value]));
+      const payload = {
+        ...inv.rows[0],
+        line_items: lineItems.rows,
+        payments: payments.rows,
+        firm_name: settings.firm_name || 'Open Scaffold Law Firm',
+        firm_address: settings.firm_address || '',
+        firm_phone: settings.firm_phone || '',
+        firm_email: settings.firm_email || '',
+        payment_terms: settings.default_payment_terms
+          ? `Payment due within ${settings.default_payment_terms} days. Trust account balances may be applied with client authorization.`
+          : null,
+      };
+
+      const outputPath = path.join(os.tmpdir(), `invoice-${inv.rows[0].invoice_number}-${Date.now()}.pdf`);
+      await generateInvoicePDF(payload, outputPath);
+
+      const pdfBytes = fs.readFileSync(outputPath);
+      fs.unlinkSync(outputPath);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename="${inv.rows[0].invoice_number}.pdf"`
+      );
+      res.send(pdfBytes);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      res.status(500).json({ error: 'PDF generation failed', detail: String(err.message || err) });
     }
   });
 

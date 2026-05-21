@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../auth';
-import { FileText, Plus, Send, DollarSign } from 'lucide-react';
+import { apiFetch, getToken } from '../auth';
+import { FileText, Plus, Send, DollarSign, Download } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal';
 
 export default function Billing({ onNavigate }) {
@@ -143,6 +143,26 @@ export default function Billing({ onNavigate }) {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
+                    <a
+                      href={`/api/invoices/${i.id}/pdf`}
+                      onClick={(ev) => {
+                        // Open the PDF with the auth token attached. Because <a> can't
+                        // set headers, we fetch + open as a blob URL.
+                        ev.preventDefault();
+                        fetch(`/api/invoices/${i.id}/pdf`, {
+                          headers: { Authorization: `Bearer ${getToken()}` },
+                        })
+                          .then((r) => r.blob())
+                          .then((blob) => {
+                            const url = URL.createObjectURL(blob);
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          });
+                      }}
+                      className="flex items-center text-xs text-gray-700 hover:underline cursor-pointer"
+                      title="Download PDF"
+                    >
+                      <Download className="w-3 h-3 mr-1" /> PDF
+                    </a>
                     {i.status === 'draft' && (
                       <button onClick={() => handleStatusChange(i.id, 'sent')}
                         className="flex items-center text-xs text-blue-700 hover:underline">
