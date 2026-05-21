@@ -55,7 +55,8 @@ export default function MatterFormModal({ open, onClose, onSaved, matter = null 
     });
   }, [open]);
 
-  // Prefill from matter when editing
+  // Prefill from matter when editing; fetch next suggested number from
+  // server when creating (uses @openscaffold/core/numberGenerator).
   useEffect(() => {
     if (!open) return;
     if (matter) {
@@ -66,10 +67,11 @@ export default function MatterFormModal({ open, onClose, onSaved, matter = null 
           ? String(matter.statute_of_limitations).slice(0, 10) : '',
       });
     } else {
-      // Generate a suggested matter number for new matters
-      const year = new Date().getFullYear();
-      const random = Math.floor(Math.random() * 900 + 100);
-      setForm({ ...initialFormState(), matter_number: `${year}-${random}` });
+      setForm(initialFormState());
+      apiFetch('/api/matters/next-number')
+        .then((r) => r.json())
+        .then((d) => setForm((f) => ({ ...f, matter_number: d.matter_number || f.matter_number })))
+        .catch(() => {});
     }
     setError(null);
   }, [open, matter]);

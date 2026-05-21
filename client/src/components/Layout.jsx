@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Briefcase, Users, Clock, FileText, Landmark, CalendarDays, Settings, LogOut, ChevronLeft, ChevronRight, Plug } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, Clock, FileText, Landmark, CalendarDays, Settings, LogOut, ChevronLeft, ChevronRight, Plug, BarChart3 } from 'lucide-react';
 import AppLogo from './AppLogo';
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { key: 'billing', label: 'Invoices', icon: FileText },
   { key: 'trust', label: 'Trust Accounts', icon: Landmark },
   { key: 'calendar', label: 'Calendar', icon: CalendarDays },
+  { key: 'utilization', label: 'Utilization', icon: BarChart3 },
   { key: 'integrations', label: 'Integrations', icon: Plug },
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
