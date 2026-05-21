@@ -35,21 +35,46 @@ export const trustBalanceTool = {
       throw new Error('Provide either client_id or matter_id');
     }
 
-    // TODO(matt): wire to GET /api/trust/client-ledger (with client_id or matter_id query)
-    const result = await callApi({
-      path: '/api/trust/client-ledger',
-      query: {
-        clientId: input.client_id,
-        matterId: input.matter_id,
-      },
-      auth: requestInfo?.req?.auth,
-    });
+    // Two requests in parallel: the client-trust-ledger row(s) and the recent
+    // transactions for the same scope, so Claude can present a balance + recent
+    // activity summary in one response.
+    const [ledger, transactions] = await Promise.all([
+      callApi({
+        path: '/api/trust/client-ledger',
+        query: { client_id: input.client_id, matter_id: input.matter_id },
+        auth: requestInfo?.req?.auth,
+      }),
+      callApi({
+        path: '/api/trust/transactions',
+        query: { client_id: input.client_id, matter_id: input.matter_id },
+        auth: requestInfo?.req?.auth,
+      }),
+    ]);
+
+    const ledgerRows = Array.isArray(ledger) ? ledger : [];
+    const totalBalance = ledgerRows.reduce((acc, r) => acc + parseFloat(r.balance || 0), 0);
+    const recentTxns = (Array.isArray(transactions) ? transactions : []).slice(0, 10).map((t) => ({
+      date: t.transaction_date,
+      type: t.transaction_type,
+      amount: t.amount,
+      running_balance: t.running_balance,
+      description: t.description,
+    }));
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
+          text: JSON.stringify(
+            {
+              total_balance: totalBalance,
+              ledger: ledgerRows,
+              recent_transactions: recentTxns,
+              note: 'Trust account modifications must be made via the OpenLawFirm UI to preserve the three-way reconciliation audit trail.',
+            },
+            null,
+            2,
+          ),
         },
       ],
     };

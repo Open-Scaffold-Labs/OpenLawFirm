@@ -41,24 +41,44 @@ export const calendarQueryTool = {
   async handler(input, { requestInfo }) {
     requireScope(requestInfo?.req, 'openlawfirm:calendar:read');
 
-    // TODO(matt): wire to GET /api/calendar with the filters below
+    const daysAhead = input.days_ahead ?? 14;
+    const today = new Date();
+    const dateFrom = input.include_past ? undefined : today.toISOString().slice(0, 10);
+    const dateTo = new Date(today.getTime() + daysAhead * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
     const result = await callApi({
       path: '/api/calendar',
       query: {
-        matterId: input.matter_id,
-        attorneyId: input.attorney_id,
-        type: input.event_type,
-        daysAhead: input.days_ahead ?? 14,
-        includePast: input.include_past ?? false,
+        matter_id: input.matter_id,
+        user_id: input.attorney_id,
+        event_type: input.event_type,
+        date_from: dateFrom,
+        date_to: dateTo,
       },
       auth: requestInfo?.req?.auth,
     });
+
+    const events = (Array.isArray(result) ? result : []).map((e) => ({
+      id: e.id,
+      title: e.title,
+      type: e.event_type,
+      start_time: e.start_time,
+      end_time: e.end_time,
+      all_day: e.all_day,
+      location: e.location,
+      matter: e.matter_title,
+      matter_number: e.matter_number,
+      attorney: e.user_name,
+      is_court_date: e.is_court_date,
+    }));
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
+          text: `Found ${events.length} event(s) in the next ${daysAhead} day(s):\n\n${JSON.stringify(events, null, 2)}`,
         },
       ],
     };

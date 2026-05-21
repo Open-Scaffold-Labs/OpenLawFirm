@@ -37,24 +37,45 @@ export const invoiceStatusTool = {
   async handler(input, { requestInfo }) {
     requireScope(requestInfo?.req, 'openlawfirm:invoice:read');
 
-    // TODO(matt): wire to GET /api/invoices with the filters below
     const result = await callApi({
       path: '/api/invoices',
       query: {
-        matterId: input.matter_id,
-        clientId: input.client_id,
+        matter_id: input.matter_id,
+        client_id: input.client_id,
         status: input.status,
-        daysOverdue: input.days_overdue,
-        limit: input.limit ?? 20,
       },
       auth: requestInfo?.req?.auth,
     });
+
+    // Days-overdue filter applied client-side (not yet in the API).
+    const today = new Date().toISOString().slice(0, 10);
+    const docs = Array.isArray(result) ? result : [];
+    const filtered = docs
+      .filter((inv) => {
+        if (input.days_overdue == null) return true;
+        if (!inv.due_date || !inv.balance_due || parseFloat(inv.balance_due) <= 0) return false;
+        const due = new Date(inv.due_date).getTime();
+        const ageDays = (new Date(today).getTime() - due) / (1000 * 60 * 60 * 24);
+        return ageDays >= input.days_overdue;
+      })
+      .slice(0, input.limit ?? 20)
+      .map((inv) => ({
+        id: inv.id,
+        invoice_number: inv.invoice_number,
+        matter: inv.matter_title,
+        client: inv.company_name || `${inv.client_first ?? ''} ${inv.client_last ?? ''}`.trim(),
+        status: inv.status,
+        total_amount: inv.total_amount,
+        balance_due: inv.balance_due,
+        invoice_date: inv.invoice_date,
+        due_date: inv.due_date,
+      }));
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
+          text: `Found ${filtered.length} invoice(s):\n\n${JSON.stringify(filtered, null, 2)}`,
         },
       ],
     };

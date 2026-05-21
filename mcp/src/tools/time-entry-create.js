@@ -50,18 +50,17 @@ export const timeEntryCreateTool = {
   async handler(input, { requestInfo }) {
     requireScope(requestInfo?.req, 'openlawfirm:time:write');
 
-    // TODO(matt): wire to POST /api/time-entries with the body below.
     const result = await callApi({
       path: '/api/time-entries',
       method: 'POST',
       body: {
-        matterId: input.matter_id,
+        matter_id: input.matter_id,
+        entry_date: input.date,
         hours: input.hours,
-        narrative: input.narrative,
-        activityCode: input.activity_code,
-        taskCode: input.task_code,
+        description: input.narrative,
+        activity_code: input.activity_code,
+        task_code: input.task_code,
         billable: input.billable ?? true,
-        date: input.date,
       },
       auth: requestInfo?.req?.auth,
     });

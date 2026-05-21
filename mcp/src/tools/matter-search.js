@@ -36,27 +36,43 @@ export const matterSearchTool = {
   async handler(input, { requestInfo }) {
     requireScope(requestInfo?.req, 'openlawfirm:matter:read');
 
-    // TODO(matt): wire to GET /api/matters with the filters below.
-    // For now, return a stub response so we can validate the MCP transport
-    // and tool registration end-to-end.
+    // The OpenLawFirm API supports `search` (text against matter_number, title,
+    // and client last_name), `status`, `practice_area_id`, and `attorney_id`.
+    // We merge `query` and `client_name` into the single `search` param.
+    const searchText = [input.query, input.client_name].filter(Boolean).join(' ').trim();
+
     const result = await callApi({
       path: '/api/matters',
       query: {
-        q: input.query,
-        client: input.client_name,
-        attorney: input.attorney_id,
+        search: searchText || undefined,
+        attorney_id: input.attorney_id,
         status: input.status,
-        practiceArea: input.practice_area,
-        limit: input.limit ?? 20,
+        practice_area_id: input.practice_area,
       },
       auth: requestInfo?.req?.auth,
     });
+
+    // Trim to the requested limit and project a smaller shape so Claude doesn't
+    // receive every column from the wide matters query.
+    const limited = (Array.isArray(result) ? result : []).slice(0, input.limit ?? 20).map((m) => ({
+      id: m.id,
+      matter_number: m.matter_number,
+      title: m.title,
+      status: m.status,
+      practice_area: m.practice_area_name,
+      responsible_attorney: m.attorney_name,
+      client: m.company_name || `${m.client_first ?? ''} ${m.client_last ?? ''}`.trim(),
+      date_opened: m.date_opened,
+      total_hours: m.total_hours,
+      total_billed: m.total_billed,
+      trust_balance: m.trust_balance,
+    }));
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
+          text: `Found ${limited.length} matter(s):\n\n${JSON.stringify(limited, null, 2)}`,
         },
       ],
     };
