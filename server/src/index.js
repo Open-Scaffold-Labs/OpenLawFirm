@@ -180,6 +180,7 @@ app.get('/api/dashboard', auth, async (req, res) => {
 const clientsRoutes = require('./routes/clients');
 const mattersRoutes = require('./routes/matters');
 const timeEntriesRoutes = require('./routes/time-entries');
+const expensesRoutes = require('./routes/expenses');
 const invoicesRoutes = require('./routes/invoices');
 const trustRoutes = require('./routes/trust');
 const calendarRoutes = require('./routes/calendar');
@@ -188,6 +189,7 @@ const settingsRoutes = require('./routes/settings');
 app.use('/api/clients', auth, clientsRoutes(pool, logAudit));
 app.use('/api/matters', auth, mattersRoutes(pool, logAudit));
 app.use('/api/time-entries', auth, timeEntriesRoutes(pool, logAudit));
+app.use('/api/expenses', auth, expensesRoutes(pool, logAudit));
 app.use('/api/invoices', auth, invoicesRoutes(pool, logAudit));
 app.use('/api/trust', auth, trustRoutes(pool, logAudit));
 app.use('/api/calendar', auth, calendarRoutes(pool, logAudit));
@@ -234,6 +236,92 @@ app.get('/api/task-codes', auth, async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM olf_task_codes WHERE is_active = true ORDER BY code');
     res.json(rows);
   } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ── Utilization / realization analytics for the managing-partner dashboard ── */
+app.get('/api/analytics/utilization', auth, async (req, res) => {
+  try {
+    const days = Math.min(parseInt(req.query.days || '30'), 365);
+    const targetHoursPerDay = parseFloat(req.query.target_hours || '7');
+    const businessDays = Math.round((days * 5) / 7); // rough business-day estimate
+    const targetHours = targetHoursPerDay * businessDays;
+
+    // Per-attorney hours + value (for the lookback window)
+    const perAttorney = await pool.query(`
+      SELECT u.id AS user_id, u.name, u.role,
+             COUNT(te.id) AS entry_count,
+             COALESCE(SUM(te.hours), 0)::numeric AS total_hours,
+             COALESCE(SUM(CASE WHEN te.billable THEN te.hours ELSE 0 END), 0)::numeric AS billable_hours,
+             COALESCE(SUM(CASE WHEN te.billable THEN te.hours * te.rate ELSE 0 END), 0)::numeric AS wip_value,
+             COALESCE(SUM(CASE WHEN te.status = 'billed' THEN te.hours * te.rate ELSE 0 END), 0)::numeric AS billed_value
+      FROM users u
+      LEFT JOIN olf_time_entries te
+        ON te.user_id = u.id
+       AND te.entry_date >= CURRENT_DATE - ($1::int * INTERVAL '1 day')
+      WHERE u.role IN ('partner', 'attorney', 'associate', 'paralegal', 'admin')
+      GROUP BY u.id, u.name, u.role
+      HAVING COUNT(te.id) > 0
+      ORDER BY billable_hours DESC
+    `, [days]);
+
+    // Firm-wide totals
+    const firmAgg = await pool.query(`
+      SELECT
+        COALESCE(SUM(hours), 0)::numeric AS total_hours,
+        COALESCE(SUM(CASE WHEN billable THEN hours ELSE 0 END), 0)::numeric AS billable_hours,
+        COALESCE(SUM(CASE WHEN billable THEN hours * rate ELSE 0 END), 0)::numeric AS wip_value,
+        COALESCE(SUM(CASE WHEN status = 'billed' THEN hours * rate ELSE 0 END), 0)::numeric AS billed_value
+      FROM olf_time_entries
+      WHERE entry_date >= CURRENT_DATE - ($1::int * INTERVAL '1 day')
+    `, [days]);
+
+    // AR aging
+    const arAging = await pool.query(`
+      SELECT
+        COALESCE(SUM(CASE WHEN due_date >= CURRENT_DATE THEN balance_due ELSE 0 END), 0)::numeric AS current_due,
+        COALESCE(SUM(CASE WHEN due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - INTERVAL '30 days' THEN balance_due ELSE 0 END), 0)::numeric AS overdue_30,
+        COALESCE(SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '30 days' AND due_date >= CURRENT_DATE - INTERVAL '60 days' THEN balance_due ELSE 0 END), 0)::numeric AS overdue_60,
+        COALESCE(SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '60 days' THEN balance_due ELSE 0 END), 0)::numeric AS overdue_90_plus
+      FROM olf_invoices
+      WHERE status IN ('sent', 'partial', 'overdue')
+    `);
+
+    // Top matters by hours in the window
+    const topMatters = await pool.query(`
+      SELECT m.id, m.matter_number, m.title,
+             COALESCE(SUM(te.hours), 0)::numeric AS hours,
+             COALESCE(SUM(te.hours * te.rate), 0)::numeric AS wip_value
+      FROM olf_matters m
+      JOIN olf_time_entries te ON te.matter_id = m.id
+      WHERE te.entry_date >= CURRENT_DATE - ($1::int * INTERVAL '1 day')
+      GROUP BY m.id, m.matter_number, m.title
+      ORDER BY hours DESC
+      LIMIT 10
+    `, [days]);
+
+    // Trust totals
+    const trust = await pool.query(`
+      SELECT COALESCE(SUM(balance), 0)::numeric AS total_balance
+      FROM olf_trust_accounts WHERE status = 'active'
+    `);
+
+    res.json({
+      window: { days, target_hours_per_attorney_per_day: targetHoursPerDay, target_hours_per_attorney: targetHours },
+      firm: firmAgg.rows[0],
+      per_attorney: perAttorney.rows.map((r) => ({
+        ...r,
+        utilization_pct: targetHours > 0
+          ? Math.round((parseFloat(r.billable_hours) / targetHours) * 100)
+          : null,
+      })),
+      ar_aging: arAging.rows[0],
+      top_matters: topMatters.rows,
+      trust: trust.rows[0],
+    });
+  } catch (err) {
+    console.error('Utilization analytics error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

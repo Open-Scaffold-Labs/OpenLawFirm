@@ -1,7 +1,28 @@
 const express = require('express');
+const { createNumberGenerator } = require('@openscaffold/core/server/numberGenerator');
 
 module.exports = function (pool, logAudit) {
   const router = express.Router();
+
+  // Date-based matter number generator (e.g. M-20260520-001). Used to
+  // suggest a default number on the new-matter form.
+  const generateMatterNumber = createNumberGenerator({
+    prefix: 'M',
+    table: 'olf_matters',
+    column: 'matter_number',
+    mode: 'date',
+    padWidth: 3,
+  });
+
+  /* Suggest the next matter number for the new-matter form */
+  router.get('/next-number', async (req, res) => {
+    try {
+      const next = await generateMatterNumber(pool);
+      res.json({ matter_number: next });
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
 
   /* List matters */
   router.get('/', async (req, res) => {
@@ -161,13 +182,54 @@ module.exports = function (pool, logAudit) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
         [req.params.id, contact_type, name, firm_name, email, phone, address, notes]
       );
+      await logAudit('contact', rows[0].id, req.user.id, 'create', `Added ${contact_type} ${name}`);
       res.status(201).json(rows[0]);
     } catch (err) {
       res.status(500).json({ error: 'Server error' });
     }
   });
 
-  /* Matter documents */
+  router.put('/:id/contacts/:contactId', async (req, res) => {
+    try {
+      const allowed = ['contact_type', 'name', 'firm_name', 'email', 'phone', 'address', 'notes'];
+      const setClauses = [];
+      const params = [];
+      for (const k of allowed) {
+        if (req.body[k] !== undefined) {
+          params.push(req.body[k]);
+          setClauses.push(`${k} = $${params.length}`);
+        }
+      }
+      if (!setClauses.length) return res.status(400).json({ error: 'No fields to update' });
+      params.push(req.params.contactId);
+      params.push(req.params.id);
+      const { rows } = await pool.query(
+        `UPDATE olf_contacts SET ${setClauses.join(', ')} WHERE id = $${params.length - 1} AND matter_id = $${params.length} RETURNING *`,
+        params
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Contact not found' });
+      res.json(rows[0]);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  router.delete('/:id/contacts/:contactId', async (req, res) => {
+    try {
+      await pool.query(
+        'DELETE FROM olf_contacts WHERE id = $1 AND matter_id = $2',
+        [req.params.contactId, req.params.id]
+      );
+      await logAudit('contact', req.params.contactId, req.user.id, 'delete', 'Contact removed from matter');
+      res.status(204).end();
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  /* Matter documents — metadata only for v0.1; physical file storage
+     comes via the DocumentStore adapter (Box/iManage/NetDocuments)
+     in a future iteration. */
   router.get('/:id/documents', async (req, res) => {
     try {
       const { rows } = await pool.query(
@@ -177,6 +239,35 @@ module.exports = function (pool, logAudit) {
         [req.params.id]
       );
       res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  router.post('/:id/documents', async (req, res) => {
+    try {
+      const { file_name, file_type, file_size, doc_category, description } = req.body;
+      if (!file_name) return res.status(400).json({ error: 'file_name required' });
+      const { rows } = await pool.query(
+        `INSERT INTO olf_documents (matter_id, file_name, file_type, file_size, doc_category, description, uploaded_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [req.params.id, file_name, file_type, file_size, doc_category, description, req.user.id]
+      );
+      await logAudit('document', rows[0].id, req.user.id, 'create', `Document: ${file_name}`);
+      res.status(201).json(rows[0]);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  router.delete('/:id/documents/:docId', async (req, res) => {
+    try {
+      await pool.query(
+        'DELETE FROM olf_documents WHERE id = $1 AND matter_id = $2',
+        [req.params.docId, req.params.id]
+      );
+      await logAudit('document', req.params.docId, req.user.id, 'delete', 'Document removed');
+      res.status(204).end();
     } catch (err) {
       res.status(500).json({ error: 'Server error' });
     }
