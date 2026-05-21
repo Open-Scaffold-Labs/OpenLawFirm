@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../auth';
-import { Clock, Plus, Check, Trash2, Pencil } from 'lucide-react';
+import { Clock, Plus, Check, Trash2, Pencil, CheckSquare } from 'lucide-react';
 import TimeEntryFormModal from '../components/TimeEntryFormModal';
 
 export default function TimeEntry({ onNavigate, selectedMatter }) {
@@ -8,6 +8,39 @@ export default function TimeEntry({ onNavigate, selectedMatter }) {
   const [todaySummary, setTodaySummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null=closed, {}=new, {id,...}=edit
+  const [selected, setSelected] = useState(new Set());
+
+  function toggleSelect(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const draftIds = entries.filter((e) => e.status === 'draft').map((e) => e.id);
+  const allDraftsSelected = draftIds.length > 0 && draftIds.every((id) => selected.has(id));
+
+  function toggleSelectAllDrafts() {
+    if (allDraftsSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(draftIds));
+    }
+  }
+
+  async function bulkApprove() {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    const res = await apiFetch('/api/time-entries/approve', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+    if (res.ok) {
+      setSelected(new Set());
+      reload();
+    }
+  }
 
   useEffect(() => { reload(); }, []);
 
@@ -42,10 +75,18 @@ export default function TimeEntry({ onNavigate, selectedMatter }) {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
           <Clock className="w-6 h-6 mr-2 text-law-600" /> Time & Billing
         </h1>
-        <button onClick={() => setEditing({})}
-          className="bg-law-600 text-white px-4 py-2 rounded-lg hover:bg-law-700 transition flex items-center text-sm">
-          <Plus className="w-4 h-4 mr-1" /> New Entry
-        </button>
+        <div className="flex items-center gap-2">
+          {selected.size > 0 && (
+            <button onClick={bulkApprove}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition flex items-center text-sm">
+              <CheckSquare className="w-4 h-4 mr-1" /> Approve {selected.size} selected
+            </button>
+          )}
+          <button onClick={() => setEditing({})}
+            className="bg-law-600 text-white px-4 py-2 rounded-lg hover:bg-law-700 transition flex items-center text-sm">
+            <Plus className="w-4 h-4 mr-1" /> New Entry
+          </button>
+        </div>
       </div>
 
       {/* Today's summary */}
@@ -74,6 +115,13 @@ export default function TimeEntry({ onNavigate, selectedMatter }) {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
+              <th className="px-3 py-3 w-8">
+                <input type="checkbox"
+                  checked={allDraftsSelected}
+                  onChange={toggleSelectAllDrafts}
+                  title="Select all draft entries"
+                  className="rounded cursor-pointer" />
+              </th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Matter</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Timekeeper</th>
@@ -87,11 +135,19 @@ export default function TimeEntry({ onNavigate, selectedMatter }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="9" className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+              <tr><td colSpan="10" className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
             ) : entries.length === 0 ? (
-              <tr><td colSpan="9" className="px-4 py-8 text-center text-gray-400">No time entries yet</td></tr>
+              <tr><td colSpan="10" className="px-4 py-8 text-center text-gray-400">No time entries yet</td></tr>
             ) : entries.map((e) => (
-              <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
+              <tr key={e.id} className={`border-b border-gray-100 hover:bg-gray-50 ${selected.has(e.id) ? 'bg-emerald-50/50' : ''}`}>
+                <td className="px-3 py-3">
+                  {e.status === 'draft' && (
+                    <input type="checkbox"
+                      checked={selected.has(e.id)}
+                      onChange={() => toggleSelect(e.id)}
+                      className="rounded cursor-pointer" />
+                  )}
+                </td>
                 <td className="px-4 py-3">{new Date(e.entry_date).toLocaleDateString()}</td>
                 <td className="px-4 py-3 font-mono text-law-700 text-xs">{e.matter_number}</td>
                 <td className="px-4 py-3">{e.name || e.full_name || '—'}</td>

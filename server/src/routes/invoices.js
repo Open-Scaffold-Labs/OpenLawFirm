@@ -132,7 +132,7 @@ module.exports = function (pool, logAudit) {
         await pool.query(
           `INSERT INTO olf_invoice_line_items (invoice_id, line_type, time_entry_id, description, quantity, rate, amount, sort_order)
            VALUES ($1, 'fee', $2, $3, $4, $5, $6, $7)`,
-          [invoiceId, te.id, `${te.entry_date} — ${te.name}: ${te.description}`, te.hours, te.rate, amount, sortOrder++]
+          [invoiceId, te.id, `${new Date(te.entry_date).toISOString().slice(0, 10)} — ${te.name}: ${te.description}`, te.hours, te.rate, amount, sortOrder++]
         );
         // Mark time entry as billed
         await pool.query('UPDATE olf_time_entries SET billed_on_invoice_id = $1, status = $2 WHERE id = $3', [invoiceId, 'billed', te.id]);

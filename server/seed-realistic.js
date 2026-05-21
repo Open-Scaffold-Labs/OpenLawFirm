@@ -126,7 +126,19 @@ async function main() {
     }
 
     // 7. Time entries — ~55 spread over the last 30 days
+    // UTBMS activity codes (L-codes) and task codes paired by typical
+    // litigation work-product so each generated time entry has both.
     const codes = ['L110', 'L120', 'L160', 'L190', 'L210', 'L240', 'L250', 'L310'];
+    const taskByActivity = {
+      L110: 'L100', // Fact Investigation/Development → Case Assessment
+      L120: 'L100', // Analysis/Strategy → Case Assessment
+      L160: 'L100', // Settlement/Non-Binding ADR → Case Assessment
+      L190: 'L100', // Other Case Assessment activities → Case Assessment
+      L210: 'L200', // Pleadings → Pre-Trial Pleadings & Motions
+      L240: 'L200', // Dispositive Motions → Pre-Trial Pleadings & Motions
+      L250: 'L300', // Other Written Motions → Discovery (best fit fallback)
+      L310: 'L300', // Written Discovery → Discovery
+    };
     const narratives = [
       'Telephone conference with client',
       'Reviewed and analyzed medical records',
@@ -160,9 +172,9 @@ async function main() {
         const rate = userId === U.attorney ? 350 : userId === U.associate ? 250 : 150;
         await client.query(
           `INSERT INTO olf_time_entries
-           (matter_id, user_id, entry_date, hours, rate, description, activity_code, billable, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8)`,
-          [matterId, userId, daysAgo(day), hours, rate, narrative, code,
+           (matter_id, user_id, entry_date, hours, rate, description, activity_code, task_code, billable, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9)`,
+          [matterId, userId, daysAgo(day), hours, rate, narrative, code, taskByActivity[code],
            day < 7 ? 'draft' : day < 20 ? 'approved' : 'billed']
         );
         timeRowCount++;

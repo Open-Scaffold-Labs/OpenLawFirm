@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../auth';
-import { ArrowLeft, Briefcase, Clock, FileText, Users, DollarSign } from 'lucide-react';
+import { ArrowLeft, Briefcase, Clock, FileText, Users, DollarSign, Pencil } from 'lucide-react';
+import MatterFormModal from '../components/MatterFormModal';
 
 export default function MatterDetail({ matterId, onNavigate }) {
   const [matter, setMatter] = useState(null);
@@ -8,6 +9,12 @@ export default function MatterDetail({ matterId, onNavigate }) {
   const [expenses, setExpenses] = useState([]);
   const [tab, setTab] = useState('overview');
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+
+  async function reloadMatter() {
+    const m = await apiFetch(`/api/matters/${matterId}`).then((r) => r.json());
+    setMatter(m);
+  }
 
   useEffect(() => {
     if (!matterId) return;
@@ -50,9 +57,15 @@ export default function MatterDetail({ matterId, onNavigate }) {
             {matter.matter_number} · {matter.practice_area_name} · {matter.attorney_name}
           </div>
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-          matter.status === 'open' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-        }`}>{matter.status}</span>
+        <div className="flex items-center gap-3">
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+            matter.status === 'open' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+          }`}>{matter.status}</span>
+          <button onClick={() => setEditing(true)}
+            className="flex items-center text-sm text-gray-700 hover:bg-gray-100 px-3 py-1 rounded-lg border border-gray-300">
+            <Pencil className="w-4 h-4 mr-1" /> Edit
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -182,6 +195,13 @@ export default function MatterDetail({ matterId, onNavigate }) {
           Matter contacts — coming soon
         </div>
       )}
+
+      <MatterFormModal
+        open={editing}
+        onClose={() => setEditing(false)}
+        onSaved={() => { setEditing(false); reloadMatter(); }}
+        matter={matter}
+      />
     </div>
   );
 }
