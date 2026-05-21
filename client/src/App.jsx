@@ -13,6 +13,7 @@ const Billing = lazy(() => import('./pages/Billing'));
 const TrustAccounting = lazy(() => import('./pages/TrustAccounting'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Integrations = lazy(() => import('./pages/Integrations'));
 
 function LoadingSpinner() {
   return (
@@ -70,6 +71,7 @@ export default function App() {
           {page === 'billing' && <Billing onNavigate={navigateTo} />}
           {page === 'trust' && <TrustAccounting onNavigate={navigateTo} />}
           {page === 'calendar' && <Calendar onNavigate={navigateTo} />}
+          {page === 'integrations' && <Integrations />}
           {page === 'settings' && <Settings />}
         </Suspense>
       </Layout>
