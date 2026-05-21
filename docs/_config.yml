@@ -1,0 +1,46 @@
+# GitHub Pages / Jekyll configuration for OpenLawFirm documentation.
+#
+# To enable: Repo Settings → Pages → Build and deployment → Source: "Deploy from a branch"
+# → Branch: "main" → Folder: "/docs"
+#
+# The published site will be available at:
+#   https://open-scaffold-labs.github.io/OpenLawFirm/
+#
+# Once openscaffoldlabs.com has an OpenLawFirm product page, the canonical
+# docs URL should redirect to the openscaffoldlabs.com surface and this Pages
+# site becomes a fallback / source of truth.
+
+title: OpenLawFirm Documentation
+description: Open-source practice management for law firms with 1–50 attorneys.
+url: https://open-scaffold-labs.github.io
+baseurl: /OpenLawFirm
+
+# Minimal theme — keeps the docs readable without much customization.
+# Replace with a richer theme once we have brand styling locked.
+theme: jekyll-theme-minimal
+
+# Markdown rendering
+markdown: kramdown
+kramdown:
+  syntax_highlighter: rouge
+
+# Front-matter defaults
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+# Exclude internal-only files from the published site
+exclude:
+  - oauth-design.md
+  - partner-programs.md
+  - README.md
+
+# Plugins
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-default-layout
+  - jekyll-titles-from-headings

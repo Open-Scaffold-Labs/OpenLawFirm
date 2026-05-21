@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="OpenLawFirm MCP connector logo">
+  <!--
+    OpenLawFirm MCP connector mark.
+    Concept: scales of justice rendered as the MCP "connector" symbol —
+    two balanced data flows joined at a central pillar (the firm's matter
+    of record). Uses the Open Scaffold brand palette.
+
+    Colors:
+      Electric Indigo (primary):  #4F46E5
+      Navy (secondary heading):    #1B3A5C
+      Background:                  transparent
+  -->
+
+  <!-- Rounded square background tile, slight bevel for app-icon contexts -->
+  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="#4F46E5"/>
+
+  <!-- Inner light surface so the mark sits on a slightly cooler indigo -->
+  <rect x="48" y="48" width="416" height="416" rx="80" ry="80" fill="#5048E9"/>
+
+  <!-- Central vertical pillar (the firm / system of record) -->
+  <rect x="246" y="120" width="20" height="280" rx="6" fill="#FFFFFF"/>
+
+  <!-- Pillar base -->
+  <rect x="200" y="400" width="112" height="14" rx="4" fill="#FFFFFF"/>
+  <rect x="180" y="414" width="152" height="10" rx="3" fill="#FFFFFF"/>
+
+  <!-- Top knob of the pillar -->
+  <circle cx="256" cy="116" r="14" fill="#FFFFFF"/>
+
+  <!-- Crossbeam connecting the two scales (the MCP fabric) -->
+  <rect x="116" y="170" width="280" height="8" rx="3" fill="#FFFFFF"/>
+
+  <!-- Left chain links (data flow into Claude) -->
+  <line x1="156" y1="178" x2="156" y2="232" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <line x1="156" y1="178" x2="138" y2="232" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <line x1="156" y1="178" x2="174" y2="232" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Right chain links (data flow back to OpenLawFirm) -->
+  <line x1="356" y1="178" x2="356" y2="232" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <line x1="356" y1="178" x2="338" y2="232" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <line x1="356" y1="178" x2="374" y2="232" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Left pan (matters / time / trust as inputs) -->
+  <path d="M 100 232
+           Q 100 280, 156 282
+           Q 212 280, 212 232
+           Q 156 244, 100 232 Z"
+        fill="#FFFFFF" opacity="0.95"/>
+
+  <!-- Right pan (Claude as the output / interface) -->
+  <path d="M 300 232
+           Q 300 280, 356 282
+           Q 412 280, 412 232
+           Q 356 244, 300 232 Z"
+        fill="#FFFFFF" opacity="0.95"/>
+
+  <!-- Pan inner highlights -->
+  <ellipse cx="156" cy="248" rx="42" ry="6" fill="#4F46E5" opacity="0.18"/>
+  <ellipse cx="356" cy="248" rx="42" ry="6" fill="#4F46E5" opacity="0.18"/>
+
+  <!-- "OLF" wordmark below — small, restrained -->
+  <text x="256" y="468"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+        font-size="36"
+        font-weight="700"
+        letter-spacing="6"
+        fill="#FFFFFF"
+        text-anchor="middle">OLF</text>
+</svg>
