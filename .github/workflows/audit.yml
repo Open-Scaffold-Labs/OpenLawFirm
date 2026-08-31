@@ -1,0 +1,148 @@
+# TEMPLATE — drop this into any OSL app repo as
+# .github/workflows/audit.yml to wire the per-PR 14-point audit gate.
+#
+# What it does:
+#   1. On every PR to main, checks out openscaffold-core (registry + scripts),
+#      the PR head, and the PR base.
+#   2. Runs the 14-point audit against both head and base.
+#   3. Fails the check if the head's score is LOWER than the base.
+#      Flat or improved = pass. This is the compliance-floor guardrail
+#      from The Last Zero white paper.
+#
+# Why the inline checkout pattern (not a composite action):
+#   GitHub Actions cannot resolve `uses:` references to actions in private
+#   repos without org-level cross-repo action access enabled. The inline
+#   pattern below uses actions/checkout@v4 (public) with an explicit PAT,
+#   which works for any access model. openscaffold-core also ships a
+#   composite action at .github/actions/audit-app/ that this template can
+#   be swapped to IF openscaffold-core goes public or org-level action
+#   access is enabled.
+#
+# Required secret on the app repo:
+#   OSL_ECOSYSTEM_TOKEN — classic PAT (https://github.com/settings/tokens)
+#   with `repo` scope. Needed to check out openscaffold-core (private).
+#   Store at Settings → Secrets and variables → Actions.
+#
+# To adopt in a new app repo:
+#   1. Copy this file to <app-repo>/.github/workflows/audit.yml
+#   2. Add the OSL_ECOSYSTEM_TOKEN secret in Settings → Secrets
+#   3. Commit + push — the check attaches to the next PR.
+#
+# No per-app edits to this file are needed; `basename $GITHUB_REPOSITORY`
+# resolves the registry id at runtime.
+
+name: Core integration audit (v3.0)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify OSL_ECOSYSTEM_TOKEN secret is set
+        run: |
+          if [ -z "${{ secrets.OSL_ECOSYSTEM_TOKEN }}" ]; then
+            echo "::error::OSL_ECOSYSTEM_TOKEN secret is not set on this repo." >&2
+            echo "::error::Create a classic PAT at https://github.com/settings/tokens with 'repo' scope," >&2
+            echo "::error::then add it as a repository secret here (Settings → Secrets and variables → Actions)." >&2
+            echo "::error::See Open-Scaffold-Labs/openscaffold-core/docs/AUDIT-ADOPTION.md for full setup." >&2
+            exit 1
+          fi
+
+      - name: Check out openscaffold-core (registry + scripts)
+        uses: actions/checkout@v4
+        with:
+          repository: Open-Scaffold-Labs/openscaffold-core
+          ref: main
+          path: .osl-core
+          token: ${{ secrets.OSL_ECOSYSTEM_TOKEN }}
+
+      - name: Resolve app id
+        id: app
+        run: |
+          id="${GITHUB_REPOSITORY##*/}"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "Registry id: $id"
+
+      - name: Check out the PR head (named after registry id)
+        uses: actions/checkout@v4
+        with:
+          path: head/${{ steps.app.outputs.id }}
+          fetch-depth: 0
+
+      - name: Check out the PR base (named after registry id)
+        uses: actions/checkout@v4
+        with:
+          path: base/${{ steps.app.outputs.id }}
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Audit PR head + base
+        id: audit
+        env:
+          APP_ID: ${{ steps.app.outputs.id }}
+        run: |
+          set -eu
+          cd .osl-core
+
+          echo "::group::Head audit"
+          node scripts/audit-app.js "$GITHUB_WORKSPACE/head/$APP_ID" --json > /tmp/head.json || true
+          node scripts/audit-app.js "$GITHUB_WORKSPACE/head/$APP_ID" || true
+          echo "::endgroup::"
+
+          echo "::group::Base audit"
+          node scripts/audit-app.js "$GITHUB_WORKSPACE/base/$APP_ID" --json > /tmp/base.json || true
+          node scripts/audit-app.js "$GITHUB_WORKSPACE/base/$APP_ID" || true
+          echo "::endgroup::"
+
+          head_passed=$(node -e 'console.log(require("/tmp/head.json").score.passed)')
+          head_total=$( node -e 'console.log(require("/tmp/head.json").score.total)')
+          head_ms=$(    node -e 'const r=require("/tmp/head.json").results.client; console.log((r && r.mobile_shell && r.mobile_shell.status) || "n/a")')
+          base_passed=$(node -e 'console.log(require("/tmp/base.json").score.passed)')
+          base_total=$( node -e 'console.log(require("/tmp/base.json").score.total)')
+
+          echo "head_passed=$head_passed" >> "$GITHUB_OUTPUT"
+          echo "head_total=$head_total"   >> "$GITHUB_OUTPUT"
+          echo "head_ms=$head_ms"         >> "$GITHUB_OUTPUT"
+          echo "base_passed=$base_passed" >> "$GITHUB_OUTPUT"
+          echo "base_total=$base_total"   >> "$GITHUB_OUTPUT"
+
+      - name: Write step summary and gate the merge
+        env:
+          HEAD_PASSED: ${{ steps.audit.outputs.head_passed }}
+          HEAD_TOTAL:  ${{ steps.audit.outputs.head_total }}
+          HEAD_MS:     ${{ steps.audit.outputs.head_ms }}
+          BASE_PASSED: ${{ steps.audit.outputs.base_passed }}
+          BASE_TOTAL:  ${{ steps.audit.outputs.base_total }}
+        run: |
+          set -eu
+          {
+            echo "## Core integration audit"
+            echo ""
+            echo "| | Passed | Total | MobileShell |"
+            echo "|---|---|---|---|"
+            echo "| Base (${{ github.event.pull_request.base.ref }}) | $BASE_PASSED | $BASE_TOTAL | — |"
+            echo "| Head (this PR) | $HEAD_PASSED | $HEAD_TOTAL | $HEAD_MS |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$HEAD_PASSED" -lt "$BASE_PASSED" ]; then
+            echo "::error::Compliance regressed: $BASE_PASSED → $HEAD_PASSED. This PR decreases the app's 14-point audit score." >&2
+            exit 1
+          fi
+          if [ "$HEAD_PASSED" -gt "$BASE_PASSED" ]; then
+            echo "::notice::Compliance improved: $BASE_PASSED → $HEAD_PASSED. Nice."
+          fi
+          exit 0
